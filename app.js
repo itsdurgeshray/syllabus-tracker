@@ -6,13 +6,17 @@ const TIER_KEYS = Object.keys(DATA);
 /**
  * state.checked[topicId]   = "YYYY-MM-DD" (date it was marked done)
  * state.resources[topicId] = [{ id, name, url, type }]  — type: "learning" | "test" | "reference"
+ * state.status[topicId]    = "revise" | "unclear" | "skip"
+ * state.notes[topicId]     = HTML string from the notes editor
  */
-let state = { checked: {}, resources: {} };
+let state = { checked: {}, resources: {}, status: {}, notes: {} };
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
   if (saved && typeof saved === "object") {
     state.checked = saved.checked || {};
     state.resources = saved.resources || {};
+    state.status = saved.status || {};
+    state.notes = saved.notes || {};
   }
 } catch (e) { /* ignore corrupt storage */ }
 
@@ -71,6 +75,36 @@ function safeHostname(url) {
 function faviconFor(url) {
   const host = safeHostname(url);
   return host ? `https://www.google.com/s2/favicons?sz=32&domain=${host}` : FALLBACK_ICON;
+}
+
+/* ---------- Status tags (revise / unclear / skip) ---------- */
+const STATUS_TYPES = {
+  revise: "Revise",
+  unclear: "Unclear",
+  skip: "Skip",
+};
+
+function getStatus(id) { return state.status[id] || null; }
+
+function setStatus(id, key) {
+  if (state.status[id] === key) delete state.status[id];
+  else state.status[id] = key;
+  save();
+}
+
+/* ---------- Notes (Tiptap rich text) ---------- */
+function getNote(id) { return state.notes[id] || ""; }
+
+function setNote(id, html, plainText) {
+  if (plainText && plainText.trim()) state.notes[id] = html;
+  else delete state.notes[id];
+  save();
+}
+
+function plainTextFrom(html) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return (tmp.textContent || "").trim();
 }
 
 /* ---------- Flatten all topics for global stats/search ---------- */
@@ -213,6 +247,7 @@ function renderDashboard() {
   const pct = total ? Math.round((done / total) * 100) : 0;
   const { current, longest } = computeStreaks();
   const { pace, etaDays } = paceEstimate(done, total);
+  const flagged = Object.values(state.status).filter(s => s === "revise" || s === "unclear").length;
 
   viewEl.innerHTML = "";
 
@@ -222,6 +257,7 @@ function renderDashboard() {
   grid.appendChild(statCard("Core syllabus", `${coreDone}/${core.length}`, "excludes foundational topics"));
   grid.appendChild(statCard("Current streak", current + (current === 1 ? " day" : " days"), longest ? `longest: ${longest} days` : "start today", current > 0 ? "good" : ""));
   grid.appendChild(statCard("Study pace", pace > 0 ? pace.toFixed(1) + "/day" : "—", etaDays ? `~${etaDays} days to finish` : "avg. last 7 days"));
+  grid.appendChild(statCard("Needs attention", String(flagged), "marked revise / unclear", flagged > 0 ? "warn" : ""));
   viewEl.appendChild(grid);
 
   // Hero row: ring + heatmap
@@ -404,21 +440,44 @@ function buildTopicRow(tierKey, si, ti, tp) {
   const main = el("div", "topic-main");
 
   const textRow = el("div", "topic-text-row");
+  const textMain = el("div", "topic-text-main");
   const label = document.createElement("label");
   label.className = "topic-text";
   label.htmlFor = cbId;
   label.textContent = tp.t;
-  textRow.appendChild(label);
-  if (tp.r) textRow.appendChild(el("span", "tag", "foundational"));
+  textMain.appendChild(label);
+  if (tp.r) textMain.appendChild(el("span", "tag", "foundational"));
+  textRow.appendChild(textMain);
+  textRow.appendChild(buildStatusRow(id));
   main.appendChild(textRow);
 
   const dateEl = el("span", "done-date", done ? `done ${state.checked[id]}` : "");
   main.appendChild(dateEl);
 
   main.appendChild(buildResourceArea(id));
+  main.appendChild(buildNotesArea(id));
 
   row.appendChild(main);
   return row;
+}
+
+/* ---------- Status row (revise / unclear / skip) ---------- */
+function buildStatusRow(id) {
+  const wrap = el("div", "status-row");
+  Object.keys(STATUS_TYPES).forEach(key => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "status-btn " + key + (getStatus(id) === key ? " active" : "");
+    btn.textContent = STATUS_TYPES[key];
+    btn.addEventListener("click", () => {
+      setStatus(id, key);
+      const now = getStatus(id);
+      wrap.querySelectorAll(".status-btn").forEach(b => b.classList.remove("active"));
+      if (now) wrap.querySelectorAll(".status-btn." + now).forEach(b => b.classList.add("active"));
+    });
+    wrap.appendChild(btn);
+  });
+  return wrap;
 }
 
 /* ---------- Resource area (attach learning/test/reference links to a topic) ---------- */
@@ -515,6 +574,90 @@ function buildResourceForm(id) {
   });
   setTimeout(() => { const n = form.querySelector(".res-name-input"); if (n) n.focus(); }, 0);
   return form;
+}
+
+/* ---------- Notes (Tiptap) ---------- */
+const NOTE_TOOLS = [
+  ["bold", "B"], ["italic", "I"], ["strike", "S"],
+  ["bulletList", "•"], ["orderedList", "1."], ["blockquote", "❝"], ["clear", "Clear"],
+];
+
+function buildNotesArea(id) {
+  const wrap = el("div", "notes-area");
+  wrap.dataset.notesFor = id;
+
+  const noteHtml = getNote(id);
+  const previewText = noteHtml ? plainTextFrom(noteHtml) : "";
+
+  if (previewText) {
+    wrap.appendChild(el("div", "notes-preview", escapeHtml(previewText.slice(0, 180)) + (previewText.length > 180 ? "…" : "")));
+  }
+
+  const toggleBtn = el("button", "notes-toggle-btn",
+    '<svg viewBox="0 0 16 16" fill="none"><path d="M4 3h8a1 1 0 0 1 1 1v6.5L10 13H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 6.5h4M6 8.7h2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>' +
+    `<span>${previewText ? "Edit note" : "Add note"}</span>`);
+  toggleBtn.type = "button";
+  toggleBtn.addEventListener("click", () => {
+    if (wrap.querySelector(".notes-editor-panel")) closeNotesEditor(id, wrap);
+    else openNotesEditor(id, wrap);
+  });
+  wrap.appendChild(toggleBtn);
+
+  return wrap;
+}
+
+function refreshNotesArea(id) {
+  document.querySelectorAll(`[data-notes-for="${id}"]`).forEach(node => {
+    node.replaceWith(buildNotesArea(id));
+  });
+}
+
+function openNotesEditor(id, wrap) {
+  wrap.classList.add("open");
+  wrap.querySelector(".notes-toggle-btn").querySelector("span").textContent = "Close note";
+
+  const panel = el("div", "notes-editor-panel");
+  const toolbar = el("div", "notes-toolbar");
+  NOTE_TOOLS.forEach(([cmd, label]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "notes-tool";
+    btn.dataset.cmd = cmd;
+    btn.textContent = label;
+    btn.addEventListener("mousedown", e => e.preventDefault()); // keep editor selection focused
+    btn.addEventListener("click", () => { if (window.TiptapNotes) window.TiptapNotes.run(editorEl, cmd); });
+    toolbar.appendChild(btn);
+  });
+  panel.appendChild(toolbar);
+
+  const editorEl = el("div", "notes-editor", '<span class="notes-loading">Loading editor…</span>');
+  panel.appendChild(editorEl);
+  wrap.appendChild(panel);
+
+  const init = () => {
+    editorEl.innerHTML = "";
+    let saveTimer;
+    window.TiptapNotes.mount(editorEl, getNote(id), (html, text) => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => setNote(id, html, text), 400);
+    });
+    editorEl._toolbarUpdate = () => {
+      toolbar.querySelectorAll(".notes-tool").forEach(b => {
+        if (b.dataset.cmd === "clear") return;
+        b.classList.toggle("active", window.TiptapNotes.isActive(editorEl, b.dataset.cmd));
+      });
+    };
+  };
+
+  if (window.TiptapNotes) init();
+  else window.addEventListener("tiptap-ready", init, { once: true });
+}
+
+function closeNotesEditor(id, wrap) {
+  const panel = wrap.querySelector(".notes-editor-panel");
+  const editorEl = panel && panel.querySelector(".notes-editor");
+  if (editorEl && window.TiptapNotes) window.TiptapNotes.destroy(editorEl);
+  refreshNotesArea(id);
 }
 
 function refreshSectionChrome(tierKey, si) {
