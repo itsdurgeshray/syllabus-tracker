@@ -3,11 +3,17 @@
 const STORAGE_KEY = "syllabusTrackerV1";
 const TIER_KEYS = Object.keys(DATA);
 
-/** state.checked[topicId] = "YYYY-MM-DD" (date it was marked done) */
-let state = { checked: {} };
+/**
+ * state.checked[topicId]   = "YYYY-MM-DD" (date it was marked done)
+ * state.resources[topicId] = [{ id, name, url, type }]  — type: "learning" | "test" | "reference"
+ */
+let state = { checked: {}, resources: {} };
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  if (saved && typeof saved === "object") state.checked = saved.checked || {};
+  if (saved && typeof saved === "object") {
+    state.checked = saved.checked || {};
+    state.resources = saved.resources || {};
+  }
 } catch (e) { /* ignore corrupt storage */ }
 
 function save() {
@@ -28,6 +34,43 @@ function setDone(id, done) {
   if (done) state.checked[id] = todayStr();
   else delete state.checked[id];
   save();
+}
+
+/* ---------- Resources (per-topic learning links) ---------- */
+const RESOURCE_TYPES = {
+  learning: "Learn",
+  test: "Test",
+  reference: "Ref",
+};
+const FALLBACK_ICON = "data:image/svg+xml," + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="4" fill="#e6e6e6"/><path d="M6.2 9.8 9.8 6.2M7 5.6H5.6a2 2 0 0 0-2 2V9m9.8-3v1.4a2 2 0 0 1-2 2H9" stroke="#9a9a9a" stroke-width="1.1" stroke-linecap="round" fill="none"/></svg>'
+);
+
+function genId() { return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function getResources(id) { return state.resources[id] || []; }
+
+function addResource(id, { name, url, type }) {
+  const list = getResources(id).slice();
+  list.push({ id: genId(), name, url, type });
+  state.resources[id] = list;
+  save();
+}
+
+function removeResource(id, resId) {
+  if (!state.resources[id]) return;
+  const list = state.resources[id].filter(r => r.id !== resId);
+  if (list.length) state.resources[id] = list; else delete state.resources[id];
+  save();
+}
+
+function safeHostname(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return null; }
+}
+
+function faviconFor(url) {
+  const host = safeHostname(url);
+  return host ? `https://www.google.com/s2/favicons?sz=32&domain=${host}` : FALLBACK_ICON;
 }
 
 /* ---------- Flatten all topics for global stats/search ---------- */
@@ -342,10 +385,12 @@ function buildSection(tierKey, sec, si) {
 function buildTopicRow(tierKey, si, ti, tp) {
   const id = topicId(tierKey, si, ti);
   const done = isDone(id);
-  const row = el("label", "topic-row" + (done ? " done" : ""));
+  const cbId = "cb-" + id;
+  const row = el("div", "topic-row" + (done ? " done" : ""));
 
   const cb = document.createElement("input");
   cb.type = "checkbox";
+  cb.id = cbId;
   cb.checked = done;
   cb.addEventListener("change", () => {
     setDone(id, cb.checked);
@@ -356,16 +401,120 @@ function buildTopicRow(tierKey, si, ti, tp) {
   });
   row.appendChild(cb);
 
-  const textWrap = el("span", null, "");
-  textWrap.style.flex = "1";
-  const span = el("span", "topic-text", tp.t);
-  const dateEl = el("span", "done-date", done ? `done ${state.checked[id]}` : "");
-  textWrap.appendChild(span);
-  textWrap.appendChild(dateEl);
-  row.appendChild(textWrap);
+  const main = el("div", "topic-main");
 
-  if (tp.r) row.appendChild(el("span", "tag", "foundational"));
+  const textRow = el("div", "topic-text-row");
+  const label = document.createElement("label");
+  label.className = "topic-text";
+  label.htmlFor = cbId;
+  label.textContent = tp.t;
+  textRow.appendChild(label);
+  if (tp.r) textRow.appendChild(el("span", "tag", "foundational"));
+  main.appendChild(textRow);
+
+  const dateEl = el("span", "done-date", done ? `done ${state.checked[id]}` : "");
+  main.appendChild(dateEl);
+
+  main.appendChild(buildResourceArea(id));
+
+  row.appendChild(main);
   return row;
+}
+
+/* ---------- Resource area (attach learning/test/reference links to a topic) ---------- */
+function buildResourceArea(id) {
+  const wrap = el("div", "resources");
+  wrap.dataset.resourcesFor = id;
+
+  const list = getResources(id);
+  if (list.length) {
+    const chips = el("div", "res-chips");
+    list.forEach(r => chips.appendChild(buildResourceChip(id, r)));
+    wrap.appendChild(chips);
+  }
+
+  const addBtn = el("button", "res-add-btn",
+    '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Add resource</span>');
+  addBtn.type = "button";
+  addBtn.addEventListener("click", e => {
+    e.preventDefault();
+    const openForm = wrap.querySelector(".res-form");
+    if (openForm) { openForm.remove(); addBtn.classList.remove("open"); return; }
+    addBtn.classList.add("open");
+    wrap.appendChild(buildResourceForm(id));
+  });
+  wrap.appendChild(addBtn);
+
+  return wrap;
+}
+
+function refreshResourceArea(id) {
+  document.querySelectorAll(`[data-resources-for="${id}"]`).forEach(node => {
+    node.replaceWith(buildResourceArea(id));
+  });
+}
+
+function buildResourceChip(id, r) {
+  const chip = el("div", "res-chip");
+
+  const a = document.createElement("a");
+  a.className = "res-chip-link";
+  a.href = r.url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.title = r.url;
+  const img = document.createElement("img");
+  img.src = faviconFor(r.url);
+  img.width = 14; img.height = 14; img.alt = "";
+  img.addEventListener("error", () => { img.src = FALLBACK_ICON; }, { once: true });
+  a.appendChild(img);
+  a.appendChild(el("span", "res-name", escapeHtml(r.name)));
+  chip.appendChild(a);
+
+  chip.appendChild(el("span", `res-tag ${r.type}`, RESOURCE_TYPES[r.type] || "Link"));
+
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "res-del";
+  del.title = "Remove resource";
+  del.textContent = "×";
+  del.addEventListener("click", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    removeResource(id, r.id);
+    refreshResourceArea(id);
+  });
+  chip.appendChild(del);
+
+  return chip;
+}
+
+function buildResourceForm(id) {
+  const form = document.createElement("form");
+  form.className = "res-form";
+  form.innerHTML = `
+    <input class="res-input res-name-input" type="text" placeholder="Resource name" maxlength="60" required />
+    <input class="res-input res-url-input" type="text" placeholder="https://…" required />
+    <select class="res-input res-type-input">
+      <option value="learning">Learning</option>
+      <option value="test">Test</option>
+      <option value="reference">Reference</option>
+    </select>
+    <button type="submit" class="res-save">Add</button>
+  `;
+  form.addEventListener("click", e => e.stopPropagation());
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = form.querySelector(".res-name-input").value.trim();
+    let url = form.querySelector(".res-url-input").value.trim();
+    const type = form.querySelector(".res-type-input").value;
+    if (!name || !url) return;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    addResource(id, { name, url, type });
+    refreshResourceArea(id);
+  });
+  setTimeout(() => { const n = form.querySelector(".res-name-input"); if (n) n.focus(); }, 0);
+  return form;
 }
 
 function refreshSectionChrome(tierKey, si) {

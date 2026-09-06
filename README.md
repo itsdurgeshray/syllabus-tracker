@@ -5,6 +5,7 @@ A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Ti
 ## Features
 
 - Full syllabus checklist for all three papers, with foundational/related topics flagged separately from core syllabus
+- Attach any number of **resources** to a topic — name + link, labeled Learning / Test / Reference, previewed with the link's own favicon (YouTube, PW, Testbook, or any site)
 - **Dashboard** with completion rings, per-section progress bars, a 91-day activity heatmap, streaks, and a pace-based estimate of days remaining
 - Instant fuzzy search (`/` to focus) across every topic in the syllabus
 - Progress and completion dates saved locally in the browser (`localStorage`) — nothing leaves your device
