@@ -1,16 +1,36 @@
 # Syllabus Tracker
 
-A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Tier 2 Paper 3 (Finance & Economics). No build step, no backend: open `index.html` and go.
+A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Tier 2 Paper 3 (Finance & Economics). No build step: open `index.html` and go.
 
 ## Features
 
 - Full syllabus checklist for all three papers, with foundational/related topics flagged separately from core syllabus
 - Attach any number of **resources** to a topic — name + link, labeled Learning / Test / Reference, previewed with the link's own favicon (YouTube, PW, Testbook, or any site)
-- **Dashboard** with completion rings, per-section progress bars, a 91-day activity heatmap, streaks, and a pace-based estimate of days remaining
+- Rich text **notes** per topic (Tiptap editor: bold/italic/strike, lists, blockquote), plus **Revise / Unclear / Skip** status tags
+- **Dashboard** with completion rings, per-section progress bars, a 91-day activity heatmap, streaks, a pace-based estimate of days remaining, and a "needs attention" rollup of flagged topics
 - Instant fuzzy search (`/` to focus) across every topic in the syllabus
-- Progress and completion dates saved locally in the browser (`localStorage`) — nothing leaves your device
+- **Google sign-in with cross-device sync**: signed out, everything is saved to `localStorage` only; signed in, the same state syncs to Firestore in real time, so progress survives a cleared cache and follows you to any device on the same Google account
 - Responsive layout: sidebar navigation on desktop, collapses to a horizontal top bar on mobile
 - Geist + Geist Mono throughout, light theme
+
+## Cloud sync setup (Firebase)
+
+`firebase-sync.js` holds the Firebase Web config (safe to keep in the repo — it identifies the project, it isn't a secret; access is enforced by Firestore's security rules, not by hiding this value). To point it at your own project:
+
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com), register a Web app, and copy its `firebaseConfig` into `firebase-sync.js`.
+2. **Authentication → Sign-in method** → enable **Google**.
+3. **Authentication → Settings → Authorized domains** → add your GitHub Pages domain (`localhost` is included by default).
+4. **Firestore Database** → create a database, then set these rules so each account can only read/write its own document:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{userId} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
+     }
+   }
+   ```
 
 ## Run locally
 

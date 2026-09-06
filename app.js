@@ -10,18 +10,26 @@ const TIER_KEYS = Object.keys(DATA);
  * state.notes[topicId]     = HTML string from the notes editor
  */
 let state = { checked: {}, resources: {}, status: {}, notes: {} };
+
+function applyState(obj) {
+  state.checked = (obj && obj.checked) || {};
+  state.resources = (obj && obj.resources) || {};
+  state.status = (obj && obj.status) || {};
+  state.notes = (obj && obj.notes) || {};
+}
+
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  if (saved && typeof saved === "object") {
-    state.checked = saved.checked || {};
-    state.resources = saved.resources || {};
-    state.status = saved.status || {};
-    state.notes = saved.notes || {};
-  }
+  if (saved && typeof saved === "object") applyState(saved);
 } catch (e) { /* ignore corrupt storage */ }
 
-function save() {
+function persistLocal() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function save() {
+  persistLocal();
+  if (window.CloudSync) window.CloudSync.pushState(state);
 }
 
 function fmtDate(d) {
@@ -706,5 +714,71 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/* ---------- Cloud sync (Google sign-in + Firestore) ---------- */
+const GOOGLE_ICON_SVG = '<svg viewBox="0 0 18 18" width="16" height="16"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62Z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18Z"/><path fill="#FBBC05" d="M3.95 10.7A5.41 5.41 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.96H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.04l3-2.33Z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.96l3 2.33C4.66 5.17 6.65 3.58 9 3.58Z"/></svg>';
+
+function renderAuthBox() {
+  const box = document.getElementById("authBox");
+  if (!box) return;
+  const user = window.CloudSync && window.CloudSync.getUser();
+
+  if (user) {
+    box.innerHTML = `
+      <div class="auth-user">
+        <img class="auth-avatar" src="${user.photoURL || ""}" alt="" referrerpolicy="no-referrer" />
+        <div class="auth-user-text">
+          <span class="auth-name">${escapeHtml(user.displayName || user.email || "Signed in")}</span>
+          <button type="button" class="auth-signout" id="signOutBtn">Sign out</button>
+        </div>
+      </div>
+      <div class="sync-status" id="syncStatus">Synced</div>`;
+    document.getElementById("signOutBtn").addEventListener("click", () => window.CloudSync.signOut());
+  } else {
+    box.innerHTML = `
+      <button class="signin-btn" id="signInBtn" type="button">
+        ${GOOGLE_ICON_SVG}
+        <span>Sign in with Google</span>
+      </button>
+      <p class="auth-hint">Sync your progress across devices</p>`;
+    document.getElementById("signInBtn").addEventListener("click", () => {
+      if (window.CloudSync) window.CloudSync.signIn().catch(err => console.error("Sign-in failed", err));
+    });
+  }
+}
+
+function setSyncStatus(text, cls) {
+  const el = document.getElementById("syncStatus");
+  if (!el) return;
+  el.textContent = text;
+  el.className = "sync-status" + (cls ? " " + cls : "");
+}
+
+window.addEventListener("cloud-auth", e => {
+  const { user, remoteState } = e.detail;
+  if (user) {
+    if (remoteState) {
+      applyState(remoteState);
+      persistLocal();
+    } else {
+      // First time this Google account signs in — seed the cloud with what's local so far.
+      window.CloudSync.pushState(state);
+    }
+  }
+  renderAuthBox();
+  render();
+});
+
+window.addEventListener("cloud-update", e => {
+  if (document.querySelector(".notes-editor-panel")) return; // don't yank focus mid-typing
+  applyState(e.detail);
+  persistLocal();
+  render();
+});
+
+window.addEventListener("cloud-syncing", () => setSyncStatus("Syncing…"));
+window.addEventListener("cloud-saved", () => setSyncStatus("Synced"));
+window.addEventListener("cloud-error", () => setSyncStatus("Sync error — retrying", "error"));
+
 /* ---------- Init ---------- */
+renderAuthBox();
 render();
