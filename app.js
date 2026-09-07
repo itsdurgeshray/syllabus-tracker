@@ -410,7 +410,7 @@ function buildSection(tierKey, sec, si) {
   head.innerHTML = `
     <svg class="chev" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <h3>${sec.name}</h3>
-    <span class="meta">${doneCount}/${sec.topics.length} · ${sec.meta}</span>`;
+    <span class="meta">${sectionMetaText(sec, doneCount)}</span>`;
   const toggle = () => { openSections[key] = !openSections[key]; wrap.classList.toggle("open"); };
   head.addEventListener("click", toggle);
   head.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
@@ -677,8 +677,13 @@ function refreshSectionChrome(tierKey, si) {
   const idx = si; // sections rendered in order
   const wrap = sections[idx];
   if (!wrap) return;
-  wrap.querySelector(".meta").textContent = `${doneCount}/${sec.topics.length} · ${sec.meta}`;
+  wrap.querySelector(".meta").textContent = sectionMetaText(sec, doneCount);
   wrap.querySelector(".bar-fill").style.width = pct + "%";
+}
+
+function sectionMetaText(sec, doneCount) {
+  const base = `${doneCount}/${sec.topics.length}`;
+  return sec.meta ? `${base} · ${sec.meta}` : base;
 }
 
 /* ---------- Search ---------- */

@@ -1,6 +1,6 @@
 # Syllabus Tracker
 
-A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Tier 2 Paper 3 (Finance & Economics). No build step: open `index.html` and go.
+A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Tier 2 Paper 2 (Statistics). No build step: open `index.html` and go.
 
 ## Features
 
@@ -62,7 +62,7 @@ or simply open `index.html` directly in a browser.
 ```
 index.html    Page shell, sidebar nav, topbar/search
 styles.css    Design tokens, layout, components (Geist fonts)
-data.js       Syllabus content (Tier 1 / Tier 2 Paper 1 / Tier 2 Paper 3)
+data.js       Syllabus content (Tier 1 / Tier 2 Paper 1 / Tier 2 Paper 2)
 app.js        State, rendering, analytics (streaks, heatmap, pace)
 ```
 
