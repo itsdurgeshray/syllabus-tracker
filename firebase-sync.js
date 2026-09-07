@@ -2,7 +2,7 @@
 // bridge (window.CloudSync) so the classic app.js script can drive it.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, onAuthStateChanged,
+  getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut as fbSignOut, onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, onSnapshot,
@@ -29,8 +29,17 @@ let saveTimer = null;
 function userDoc(uid) { return doc(db, "users", uid); }
 
 async function signIn() {
-  await signInWithPopup(auth, provider);
+  // Redirect-based flow: works reliably in Safari and on mobile, where popup
+  // sign-in is often blocked by tracking-prevention / third-party cookie rules.
+  await signInWithRedirect(auth, provider);
 }
+
+// Surfaces errors from the redirect round-trip (e.g. blocked by browser policy,
+// account picker cancelled) — resolves to null on a normal, no-redirect page load.
+getRedirectResult(auth).catch(err => {
+  console.error("CloudSync: sign-in redirect failed", err);
+  window.dispatchEvent(new CustomEvent("cloud-signin-error", { detail: err }));
+});
 
 async function signOutUser() {
   await fbSignOut(auth);

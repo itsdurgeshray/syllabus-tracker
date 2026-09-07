@@ -778,6 +778,17 @@ window.addEventListener("cloud-update", e => {
 window.addEventListener("cloud-syncing", () => setSyncStatus("Syncing…"));
 window.addEventListener("cloud-saved", () => setSyncStatus("Synced"));
 window.addEventListener("cloud-error", () => setSyncStatus("Sync error — retrying", "error"));
+window.addEventListener("cloud-signin-error", e => {
+  const code = e.detail && e.detail.code;
+  const box = document.getElementById("authBox");
+  if (box && !box.querySelector(".auth-user")) {
+    const msg = code === "auth/unauthorized-domain"
+      ? "This domain isn't authorized for sign-in yet."
+      : "Sign-in didn't complete — try again.";
+    const hint = box.querySelector(".auth-hint");
+    if (hint) hint.textContent = msg;
+  }
+});
 
 /* ---------- Init ---------- */
 renderAuthBox();
