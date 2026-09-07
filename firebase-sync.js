@@ -10,7 +10,7 @@ import {
 
 const firebaseConfig = {
   apiKey: "AIzaSyAKEgbNJ0djHlKAHTmR_NCU8_rnYxdKiRs",
-  authDomain: "syllabus-trackerr.web.app",
+  authDomain: "syllabus-trackerr.firebaseapp.com",
   projectId: "syllabus-trackerr",
   storageBucket: "syllabus-trackerr.firebasestorage.app",
   messagingSenderId: "141824625591",
