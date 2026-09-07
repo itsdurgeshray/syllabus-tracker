@@ -32,6 +32,15 @@ A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Ti
    }
    ```
 
+**Deploy target matters for sign-in.** Google Sign-In needs the app's own origin to match `authDomain`, or Safari's cross-site storage rules silently break the redirect result on the way back (OAuth succeeds, but the app never sees it). Hosting on the same Firebase project sidesteps this entirely:
+```bash
+npm install -g firebase-tools
+firebase login
+cd syllabus-tracker
+firebase deploy --only hosting
+```
+This publishes to `https://<project-id>.web.app`, on the same origin as `authDomain` — that's the URL to actually use sign-in from. Hosting elsewhere (Vercel, GitHub Pages, etc.) still works for the rest of the app, just not reliably for sign-in in Safari.
+
 ## Run locally
 
 No dependencies to install — just serve the folder statically:
