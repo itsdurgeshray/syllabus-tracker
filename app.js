@@ -1,12 +1,12 @@
-// Syllabus Tracker — app logic (vanilla JS, no build step)
+// Syllabus Tracker - app logic (vanilla JS, no build step)
 
 const STORAGE_KEY = "syllabusTrackerV1";
 const TIER_KEYS = Object.keys(DATA);
 
 /**
  * state.checked[topicId]   = "YYYY-MM-DD" (date it was marked done)
- * state.resources[topicId] = [{ id, name, url, type }]  — type: "learning" | "test" | "reference"
- * state.status[topicId]    = "revise" | "unclear" | "skip"
+ * state.resources[topicId] = [{ id, name, url, type }], type: "learning" | "test" | "reference"
+ * state.status[topicId]    = "revise" | "doubt" | "skip"
  * state.notes[topicId]     = HTML string from the notes editor
  */
 let state = { checked: {}, resources: {}, status: {}, notes: {} };
@@ -16,6 +16,10 @@ function applyState(obj) {
   state.resources = (obj && obj.resources) || {};
   state.status = (obj && obj.status) || {};
   state.notes = (obj && obj.notes) || {};
+  // Migrate the old "unclear" status label to "doubt".
+  Object.keys(state.status).forEach(id => {
+    if (state.status[id] === "unclear") state.status[id] = "doubt";
+  });
 }
 
 try {
@@ -85,18 +89,18 @@ function faviconFor(url) {
   return host ? `https://www.google.com/s2/favicons?sz=32&domain=${host}` : FALLBACK_ICON;
 }
 
-/* ---------- Status tags (revise / unclear / skip) ---------- */
+/* ---------- Status tags (revise / doubt / skip) ---------- */
 const STATUS_TYPES = {
   revise: "Revise",
-  unclear: "Unclear",
+  doubt: "Doubt",
   skip: "Skip",
 };
 
 function getStatus(id) { return state.status[id] || null; }
 
 function setStatus(id, key) {
-  if (state.status[id] === key) delete state.status[id];
-  else state.status[id] = key;
+  if (key) state.status[id] = key;
+  else delete state.status[id];
   save();
 }
 
@@ -178,7 +182,34 @@ function paceEstimate(totalDone, totalTopics) {
 /* ---------- View state ---------- */
 let activeView = "dashboard";
 let searchQuery = "";
+let sortMode = "default";
 const openSections = {}; // key: `${tierKey}::${si}` -> bool
+
+const SORT_MODES = {
+  default: "Syllabus order",
+  incomplete: "Incomplete first",
+  complete: "Completed first",
+  flagged: "Flagged first",
+  az: "A to Z",
+};
+
+/** Indices into sec.topics, reordered for display - topic ids still use the original index. */
+function sortedTopicIndices(tierKey, si, sec) {
+  const idx = sec.topics.map((_, ti) => ti);
+  if (sortMode === "default") return idx;
+
+  const doneRank = ti => (isDone(topicId(tierKey, si, ti)) ? 1 : 0);
+  const flagRank = ti => {
+    const s = getStatus(topicId(tierKey, si, ti));
+    return s === "revise" || s === "doubt" ? 0 : s === "skip" ? 2 : 1;
+  };
+
+  if (sortMode === "incomplete") idx.sort((a, b) => doneRank(a) - doneRank(b));
+  else if (sortMode === "complete") idx.sort((a, b) => doneRank(b) - doneRank(a));
+  else if (sortMode === "flagged") idx.sort((a, b) => flagRank(a) - flagRank(b));
+  else if (sortMode === "az") idx.sort((a, b) => sec.topics[a].t.localeCompare(sec.topics[b].t));
+  return idx;
+}
 
 /* ---------- DOM refs ---------- */
 const viewEl = document.getElementById("view");
@@ -255,7 +286,7 @@ function renderDashboard() {
   const pct = total ? Math.round((done / total) * 100) : 0;
   const { current, longest } = computeStreaks();
   const { pace, etaDays } = paceEstimate(done, total);
-  const flagged = Object.values(state.status).filter(s => s === "revise" || s === "unclear").length;
+  const flagged = Object.values(state.status).filter(s => s === "revise" || s === "doubt").length;
 
   viewEl.innerHTML = "";
 
@@ -264,8 +295,8 @@ function renderDashboard() {
   grid.appendChild(statCard("Overall completion", pct + "%", `${done} / ${total} topics`, "accent"));
   grid.appendChild(statCard("Core syllabus", `${coreDone}/${core.length}`, "excludes foundational topics"));
   grid.appendChild(statCard("Current streak", current + (current === 1 ? " day" : " days"), longest ? `longest: ${longest} days` : "start today", current > 0 ? "good" : ""));
-  grid.appendChild(statCard("Study pace", pace > 0 ? pace.toFixed(1) + "/day" : "—", etaDays ? `~${etaDays} days to finish` : "avg. last 7 days"));
-  grid.appendChild(statCard("Needs attention", String(flagged), "marked revise / unclear", flagged > 0 ? "warn" : ""));
+  grid.appendChild(statCard("Study pace", pace > 0 ? pace.toFixed(1) + "/day" : "-", etaDays ? `~${etaDays} days to finish` : "avg. last 7 days"));
+  grid.appendChild(statCard("Needs attention", String(flagged), "marked revise / doubt", flagged > 0 ? "warn" : ""));
   viewEl.appendChild(grid);
 
   // Hero row: ring + heatmap
@@ -336,7 +367,7 @@ function buildHeatmap() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Start the grid on the Sunday at/before 91 days ago, end on the Saturday at/after today —
+  // Start the grid on the Sunday at/before 91 days ago, end on the Saturday at/after today -
   // this keeps every column a full Sun–Sat week, which lines up with grid-auto-flow:column.
   const start = new Date(today);
   start.setDate(start.getDate() - 90);
@@ -386,13 +417,38 @@ function renderTier(tierKey) {
   });
   viewEl.appendChild(pattern);
 
-  viewEl.appendChild(el("div", "legend", `
+  const toolsRow = el("div", "tools-row");
+  toolsRow.appendChild(el("div", "legend", `
     <span><span class="dot"></span> Core syllabus topic</span>
-    <span><span class="dot dash"></span> Foundational / related — not asked directly, but needed to understand a core topic</span>`));
+    <span><span class="dot dash"></span> Foundational / related - not asked directly, but needed to understand a core topic</span>`));
+  toolsRow.appendChild(buildSortControl(tierKey));
+  viewEl.appendChild(toolsRow);
 
   tier.sections.forEach((sec, si) => {
     viewEl.appendChild(buildSection(tierKey, sec, si));
   });
+}
+
+function buildSortControl(tierKey) {
+  const wrap = el("div", "sort-control");
+  wrap.appendChild(el("label", null, "Sort"));
+
+  const selectWrap = el("div", "select-wrap");
+  const select = document.createElement("select");
+  Object.keys(SORT_MODES).forEach(key => {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = SORT_MODES[key];
+    if (key === sortMode) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.addEventListener("change", () => {
+    sortMode = select.value;
+    renderTier(tierKey);
+  });
+  selectWrap.appendChild(select);
+  wrap.appendChild(selectWrap);
+  return wrap;
 }
 
 function buildSection(tierKey, sec, si) {
@@ -420,7 +476,7 @@ function buildSection(tierKey, sec, si) {
   wrap.appendChild(barTrack);
 
   const topicsEl = el("div", "topics");
-  sec.topics.forEach((tp, ti) => topicsEl.appendChild(buildTopicRow(tierKey, si, ti, tp)));
+  sortedTopicIndices(tierKey, si, sec).forEach(ti => topicsEl.appendChild(buildTopicRow(tierKey, si, ti, sec.topics[ti])));
   wrap.appendChild(topicsEl);
 
   return wrap;
@@ -469,22 +525,35 @@ function buildTopicRow(tierKey, si, ti, tp) {
   return row;
 }
 
-/* ---------- Status row (revise / unclear / skip) ---------- */
+/* ---------- Status dropdown (revise / doubt / skip) ---------- */
 function buildStatusRow(id) {
   const wrap = el("div", "status-row");
+  const selectWrap = el("div", "status-select-wrap");
+
+  const select = document.createElement("select");
+  const current = getStatus(id) || "";
+  select.className = "status-select" + (current ? " st-" + current : "");
+
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "No status";
+  select.appendChild(opt0);
+
   Object.keys(STATUS_TYPES).forEach(key => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "status-btn " + key + (getStatus(id) === key ? " active" : "");
-    btn.textContent = STATUS_TYPES[key];
-    btn.addEventListener("click", () => {
-      setStatus(id, key);
-      const now = getStatus(id);
-      wrap.querySelectorAll(".status-btn").forEach(b => b.classList.remove("active"));
-      if (now) wrap.querySelectorAll(".status-btn." + now).forEach(b => b.classList.add("active"));
-    });
-    wrap.appendChild(btn);
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = STATUS_TYPES[key];
+    if (key === current) opt.selected = true;
+    select.appendChild(opt);
   });
+
+  select.addEventListener("change", () => {
+    setStatus(id, select.value || null);
+    select.className = "status-select" + (select.value ? " st-" + select.value : "");
+  });
+
+  selectWrap.appendChild(select);
+  wrap.appendChild(selectWrap);
   return wrap;
 }
 
@@ -765,7 +834,7 @@ window.addEventListener("cloud-auth", e => {
       applyState(remoteState);
       persistLocal();
     } else {
-      // First time this Google account signs in — seed the cloud with what's local so far.
+      // First time this Google account signs in - seed the cloud with what's local so far.
       window.CloudSync.pushState(state);
     }
   }
@@ -782,14 +851,14 @@ window.addEventListener("cloud-update", e => {
 
 window.addEventListener("cloud-syncing", () => setSyncStatus("Syncing…"));
 window.addEventListener("cloud-saved", () => setSyncStatus("Synced"));
-window.addEventListener("cloud-error", () => setSyncStatus("Sync error — retrying", "error"));
+window.addEventListener("cloud-error", () => setSyncStatus("Sync error - retrying", "error"));
 window.addEventListener("cloud-signin-error", e => {
   const code = e.detail && e.detail.code;
   const box = document.getElementById("authBox");
   if (box && !box.querySelector(".auth-user")) {
     const msg = code === "auth/unauthorized-domain"
       ? "This domain isn't authorized for sign-in yet."
-      : "Sign-in didn't complete — try again.";
+      : "Sign-in didn't complete - try again.";
     const hint = box.querySelector(".auth-hint");
     if (hint) hint.textContent = msg;
   }

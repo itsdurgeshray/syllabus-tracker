@@ -1,12 +1,12 @@
 # Syllabus Tracker
 
-A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Tier 2 Paper 2 (Statistics). No build step: open `index.html` and go.
+A fast, minimal study tracker for **SSC CGL** - Tier 1, Tier 2 Paper 1, and Tier 2 Paper 2 (Statistics). No build step: open `index.html` and go.
 
 ## Features
 
 - Full syllabus checklist for all three papers, with foundational/related topics flagged separately from core syllabus
-- Attach any number of **resources** to a topic — name + link, labeled Learning / Test / Reference, previewed with the link's own favicon (YouTube, PW, Testbook, or any site)
-- Rich text **notes** per topic (Tiptap editor: bold/italic/strike, lists, blockquote), plus **Revise / Unclear / Skip** status tags
+- Attach any number of **resources** to a topic - name + link, labeled Learning / Test / Reference, previewed with the link's own favicon (YouTube, PW, Testbook, or any site)
+- Rich text **notes** per topic (Tiptap editor: bold/italic/strike, lists, blockquote), plus a **Revise / Doubt / Skip** status dropdown, and a sort control (incomplete/completed/flagged first, A-Z)
 - **Dashboard** with completion rings, per-section progress bars, a 91-day activity heatmap, streaks, a pace-based estimate of days remaining, and a "needs attention" rollup of flagged topics
 - Instant fuzzy search (`/` to focus) across every topic in the syllabus
 - **Google sign-in with cross-device sync**: signed out, everything is saved to `localStorage` only; signed in, the same state syncs to Firestore in real time, so progress survives a cleared cache and follows you to any device on the same Google account
@@ -15,7 +15,7 @@ A fast, minimal study tracker for **SSC CGL** — Tier 1, Tier 2 Paper 1, and Ti
 
 ## Cloud sync setup (Firebase)
 
-`firebase-sync.js` holds the Firebase Web config (safe to keep in the repo — it identifies the project, it isn't a secret; access is enforced by Firestore's security rules, not by hiding this value). To point it at your own project:
+`firebase-sync.js` holds the Firebase Web config (safe to keep in the repo - it identifies the project, it isn't a secret; access is enforced by Firestore's security rules, not by hiding this value). To point it at your own project:
 
 1. Create a project at [console.firebase.google.com](https://console.firebase.google.com), register a Web app, and copy its `firebaseConfig` into `firebase-sync.js`.
 2. **Authentication → Sign-in method** → enable **Google**.
@@ -39,11 +39,11 @@ firebase login
 cd syllabus-tracker
 firebase deploy --only hosting
 ```
-This publishes to `https://<project-id>.web.app`, on the same origin as `authDomain` — that's the URL to actually use sign-in from. Hosting elsewhere (Vercel, GitHub Pages, etc.) still works for the rest of the app, just not reliably for sign-in in Safari.
+This publishes to `https://<project-id>.web.app`, on the same origin as `authDomain` - that's the URL to actually use sign-in from. Hosting elsewhere (Vercel, GitHub Pages, etc.) still works for the rest of the app, just not reliably for sign-in in Safari.
 
 ## Run locally
 
-No dependencies to install — just serve the folder statically:
+No dependencies to install - just serve the folder statically:
 
 ```bash
 npx serve .
@@ -68,4 +68,4 @@ app.js        State, rendering, analytics (streaks, heatmap, pace)
 
 ## Editing the syllabus
 
-All content lives in `data.js` as plain objects — add, rename, or remove topics there; the UI (checklist, progress bars, dashboard stats) recomputes automatically. Mark a topic `{ t: "...", r: 1 }` to flag it as foundational/related rather than directly examined.
+All content lives in `data.js` as plain objects - add, rename, or remove topics there; the UI (checklist, progress bars, dashboard stats) recomputes automatically. Mark a topic `{ t: "...", r: 1 }` to flag it as foundational/related rather than directly examined.
