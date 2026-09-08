@@ -326,8 +326,8 @@ button{ font-family:inherit; }
 .chev{ width:14px; height:14px; flex:none; color:var(--ink-faint); transition:transform .16s ease; }
 .section.open .chev{ transform:rotate(90deg); }
 
-.bar-track{ height:5px; background:var(--bg-subtle); border-radius:3px; overflow:hidden; margin:0 16px 14px; border:1px solid var(--border); border-width:1px 0; }
-.bar-fill{ height:100%; background:var(--good); border-radius:3px; transition:width .25s ease; }
+.bar-track{ height:8px; background:var(--bg-subtle); border-radius:4px; overflow:hidden; margin:0 16px 14px; border:1px solid var(--border); border-width:1px 0; }
+.bar-fill{ height:100%; background:var(--good); border-radius:4px; transition:width .25s ease; }
 
 .topics{ display:none; padding:0 10px 8px; }
 .section.open .topics{ display:block; }
@@ -336,31 +336,53 @@ button{ font-family:inherit; }
 .topic-row:last-child{ border-bottom:none; }
 .topic-row:hover{ background:var(--surface-hover); }
 .topic-row.hidden{ display:none; }
+.topic-row.in-progress{ background:var(--accent-soft); }
+.topic-row.in-progress:hover{ background:var(--accent-soft); filter:brightness(0.98); }
 
-.topic-row input[type=checkbox]{
-  appearance:none; -webkit-appearance:none;
-  width:17px; height:17px; flex:none;
-  border:1.5px solid var(--border-strong);
-  border-radius:5px;
-  margin-top:2px;
-  cursor:pointer;
-  position:relative;
-  background:var(--surface);
-  transition:background .12s, border-color .12s;
+/* Progress pill (Not started / In progress / Done) + its dropdown menu */
+.progress-control{ position:relative; flex:none; margin-top:1px; }
+.progress-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  appearance:none; cursor:pointer;
+  border:1px solid var(--border-strong); background:var(--surface);
+  border-radius:999px; padding:4px 10px 4px 8px;
+  font-family:inherit; font-size:11px; font-weight:600;
+  color:var(--ink-soft);
+  white-space:nowrap;
+  transition:border-color .12s, background .12s;
 }
-.topic-row input[type=checkbox]:checked{ background:var(--good); border-color:var(--good); }
-.topic-row input[type=checkbox]:checked::after{
-  content:""; position:absolute; left:5px; top:1px;
-  width:4px; height:8px;
-  border:solid white; border-width:0 2px 2px 0;
-  transform:rotate(45deg);
+.progress-pill:hover{ border-color:var(--ink-faint); }
+.progress-pill:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.progress-dot{ width:7px; height:7px; border-radius:50%; flex:none; background:var(--ink-faint); }
+.progress-pill.pp-todo .progress-dot{ background:var(--ink-faint); }
+.progress-pill.pp-in_progress{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent-ink); }
+.progress-pill.pp-in_progress .progress-dot{ background:var(--accent); }
+.progress-pill.pp-done{ border-color:var(--good); background:var(--good-soft); color:var(--good); }
+.progress-pill.pp-done .progress-dot{ background:var(--good); }
+
+.progress-menu{
+  position:absolute; top:calc(100% + 6px); left:0; z-index:20;
+  min-width:150px;
+  background:var(--surface); border:1px solid var(--border); border-radius:9px;
+  box-shadow:var(--shadow-md);
+  padding:5px;
 }
-.topic-row input[type=checkbox]:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.progress-menu-item{
+  display:flex; align-items:center; gap:8px; width:100%;
+  appearance:none; border:none; background:none; cursor:pointer;
+  font-family:inherit; font-size:12.5px; font-weight:500; color:var(--ink);
+  padding:7px 8px; border-radius:6px; text-align:left;
+}
+.progress-menu-item:hover{ background:var(--surface-hover); }
+.progress-menu-item.active{ font-weight:700; }
+.progress-menu-item .progress-dot.pp-todo{ background:var(--ink-faint); }
+.progress-menu-item .progress-dot.pp-in_progress{ background:var(--accent); }
+.progress-menu-item .progress-dot.pp-done{ background:var(--good); }
 
 .topic-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
 .topic-text-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
 .topic-text-main{ display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; flex:1 1 auto; min-width:0; }
-.topic-text{ flex:1 1 auto; min-width:120px; font-size:13.5px; cursor:pointer; }
+.topic-text{ flex:1 1 auto; min-width:120px; font-size:13.5px; }
 .topic-row.done .topic-text{ color:var(--ink-faint); text-decoration:line-through; text-decoration-color:var(--border-strong); }
 .topic-row .done-date{ font-size:10.5px; color:var(--ink-faint); font-family:"Geist Mono"; margin-top:-2px; display:block; }
 

@@ -4,14 +4,16 @@ const STORAGE_KEY = "syllabusTrackerV1";
 const TIER_KEYS = Object.keys(DATA);
 
 /**
+ * state.progress[topicId]  = "in_progress" | "done" (absent = not started)
  * state.checked[topicId]   = "YYYY-MM-DD" (date it was marked done)
  * state.resources[topicId] = [{ id, name, url, type }], type: "learning" | "test" | "reference"
  * state.status[topicId]    = "revise" | "doubt" | "skip"
  * state.notes[topicId]     = HTML string from the notes editor
  */
-let state = { checked: {}, resources: {}, status: {}, notes: {} };
+let state = { progress: {}, checked: {}, resources: {}, status: {}, notes: {} };
 
 function applyState(obj) {
+  state.progress = (obj && obj.progress) || {};
   state.checked = (obj && obj.checked) || {};
   state.resources = (obj && obj.resources) || {};
   state.status = (obj && obj.status) || {};
@@ -19,6 +21,10 @@ function applyState(obj) {
   // Migrate the old "unclear" status label to "doubt".
   Object.keys(state.status).forEach(id => {
     if (state.status[id] === "unclear") state.status[id] = "doubt";
+  });
+  // Backfill progress for topics checked done before this feature existed.
+  Object.keys(state.checked).forEach(id => {
+    if (!state.progress[id]) state.progress[id] = "done";
   });
 }
 
@@ -44,11 +50,24 @@ function todayStr() { return fmtDate(new Date()); }
 
 function topicId(tierKey, si, ti) { return `${tierKey}::${si}::${ti}`; }
 
-function isDone(id) { return !!state.checked[id]; }
+/* ---------- Progress status (Not started / In progress / Done) ---------- */
+const PROGRESS_STATES = [
+  { key: "todo", label: "Not started", color: "var(--ink-faint)" },
+  { key: "in_progress", label: "In progress", color: "var(--accent)" },
+  { key: "done", label: "Done", color: "var(--good)" },
+];
 
-function setDone(id, done) {
-  if (done) state.checked[id] = todayStr();
+function getProgress(id) { return state.progress[id] || "todo"; }
+function isDone(id) { return getProgress(id) === "done"; }
+function isInProgress(id) { return getProgress(id) === "in_progress"; }
+
+function setProgress(id, key) {
+  if (key === "todo") delete state.progress[id];
+  else state.progress[id] = key;
+
+  if (key === "done") state.checked[id] = todayStr();
   else delete state.checked[id];
+
   save();
 }
 
@@ -187,7 +206,8 @@ const openSections = {}; // key: `${tierKey}::${si}` -> bool
 
 const SORT_MODES = {
   default: "Syllabus order",
-  incomplete: "Incomplete first",
+  active: "In progress first",
+  incomplete: "Not started first",
   complete: "Completed first",
   flagged: "Flagged first",
   az: "A to Z",
@@ -199,12 +219,14 @@ function sortedTopicIndices(tierKey, si, sec) {
   if (sortMode === "default") return idx;
 
   const doneRank = ti => (isDone(topicId(tierKey, si, ti)) ? 1 : 0);
+  const activeRank = ti => (isInProgress(topicId(tierKey, si, ti)) ? 0 : 1);
   const flagRank = ti => {
     const s = getStatus(topicId(tierKey, si, ti));
     return s === "revise" || s === "doubt" ? 0 : s === "skip" ? 2 : 1;
   };
 
-  if (sortMode === "incomplete") idx.sort((a, b) => doneRank(a) - doneRank(b));
+  if (sortMode === "active") idx.sort((a, b) => activeRank(a) - activeRank(b));
+  else if (sortMode === "incomplete") idx.sort((a, b) => doneRank(a) - doneRank(b));
   else if (sortMode === "complete") idx.sort((a, b) => doneRank(b) - doneRank(a));
   else if (sortMode === "flagged") idx.sort((a, b) => flagRank(a) - flagRank(b));
   else if (sortMode === "az") idx.sort((a, b) => sec.topics[a].t.localeCompare(sec.topics[b].t));
@@ -287,6 +309,7 @@ function renderDashboard() {
   const { current, longest } = computeStreaks();
   const { pace, etaDays } = paceEstimate(done, total);
   const flagged = Object.values(state.status).filter(s => s === "revise" || s === "doubt").length;
+  const inProgress = TOPICS.filter(t => isInProgress(t.id)).length;
 
   viewEl.innerHTML = "";
 
@@ -294,6 +317,7 @@ function renderDashboard() {
   const grid = el("div", "stat-grid");
   grid.appendChild(statCard("Overall completion", pct + "%", `${done} / ${total} topics`, "accent"));
   grid.appendChild(statCard("Core syllabus", `${coreDone}/${core.length}`, "excludes foundational topics"));
+  grid.appendChild(statCard("In progress", String(inProgress), "currently studying", inProgress > 0 ? "accent" : ""));
   grid.appendChild(statCard("Current streak", current + (current === 1 ? " day" : " days"), longest ? `longest: ${longest} days` : "start today", current > 0 ? "good" : ""));
   grid.appendChild(statCard("Study pace", pace > 0 ? pace.toFixed(1) + "/day" : "-", etaDays ? `~${etaDays} days to finish` : "avg. last 7 days"));
   grid.appendChild(statCard("Needs attention", String(flagged), "marked revise / doubt", flagged > 0 ? "warn" : ""));
@@ -485,30 +509,21 @@ function buildSection(tierKey, sec, si) {
 function buildTopicRow(tierKey, si, ti, tp) {
   const id = topicId(tierKey, si, ti);
   const done = isDone(id);
-  const cbId = "cb-" + id;
-  const row = el("div", "topic-row" + (done ? " done" : ""));
+  const row = el("div", "topic-row" + (done ? " done" : "") + (isInProgress(id) ? " in-progress" : ""));
 
-  const cb = document.createElement("input");
-  cb.type = "checkbox";
-  cb.id = cbId;
-  cb.checked = done;
-  cb.addEventListener("change", () => {
-    setDone(id, cb.checked);
-    row.classList.toggle("done", cb.checked);
-    dateEl.textContent = cb.checked ? `done ${state.checked[id]}` : "";
+  row.appendChild(buildProgressControl(id, key => {
+    row.classList.toggle("done", key === "done");
+    row.classList.toggle("in-progress", key === "in_progress");
+    dateEl.textContent = key === "done" ? `done ${state.checked[id]}` : "";
     refreshSectionChrome(tierKey, si);
     renderSidebarRing();
-  });
-  row.appendChild(cb);
+  }));
 
   const main = el("div", "topic-main");
 
   const textRow = el("div", "topic-text-row");
   const textMain = el("div", "topic-text-main");
-  const label = document.createElement("label");
-  label.className = "topic-text";
-  label.htmlFor = cbId;
-  label.textContent = tp.t;
+  const label = el("span", "topic-text", tp.t);
   textMain.appendChild(label);
   if (tp.r) textMain.appendChild(el("span", "tag", "foundational"));
   textRow.appendChild(textMain);
@@ -523,6 +538,69 @@ function buildTopicRow(tierKey, si, ti, tp) {
 
   row.appendChild(main);
   return row;
+}
+
+/* ---------- Progress pill + dropdown menu (ClickUp-style) ---------- */
+let closeOpenProgressMenu = null;
+
+function buildProgressControl(id, onChange) {
+  const wrap = el("div", "progress-control");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  renderProgressPill(btn, getProgress(id));
+
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    if (wrap.querySelector(".progress-menu")) { if (closeOpenProgressMenu) closeOpenProgressMenu(); return; }
+    openProgressMenu(wrap, btn, id, onChange);
+  });
+
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+function renderProgressPill(btn, key) {
+  const st = PROGRESS_STATES.find(s => s.key === key) || PROGRESS_STATES[0];
+  btn.className = "progress-pill pp-" + st.key;
+  btn.innerHTML = `<span class="progress-dot"></span><span class="progress-label">${st.label}</span>`;
+}
+
+function openProgressMenu(wrap, btn, id, onChange) {
+  if (closeOpenProgressMenu) closeOpenProgressMenu();
+
+  const menu = el("div", "progress-menu");
+  PROGRESS_STATES.forEach(st => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "progress-menu-item" + (getProgress(id) === st.key ? " active" : "");
+    item.innerHTML = `<span class="progress-dot pp-${st.key}"></span><span>${st.label}</span>`;
+    item.addEventListener("click", e => {
+      e.stopPropagation();
+      setProgress(id, st.key);
+      renderProgressPill(btn, st.key);
+      closeMenu();
+      onChange(st.key);
+    });
+    menu.appendChild(item);
+  });
+  wrap.appendChild(menu);
+
+  function closeMenu() {
+    menu.remove();
+    document.removeEventListener("click", outsideHandler);
+    document.removeEventListener("keydown", escHandler);
+    closeOpenProgressMenu = null;
+  }
+  function outsideHandler(e) { if (!wrap.contains(e.target)) closeMenu(); }
+  function escHandler(e) { if (e.key === "Escape") closeMenu(); }
+
+  // Defer so the click that opened the menu doesn't immediately close it.
+  setTimeout(() => {
+    document.addEventListener("click", outsideHandler);
+    document.addEventListener("keydown", escHandler);
+  }, 0);
+
+  closeOpenProgressMenu = closeMenu;
 }
 
 /* ---------- Status dropdown (revise / doubt / skip) ---------- */
