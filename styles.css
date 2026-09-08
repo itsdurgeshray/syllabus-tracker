@@ -232,7 +232,7 @@ button{ font-family:inherit; }
   flex:1; height:7px; background:var(--bg-subtle); border-radius:4px; overflow:hidden;
   border:1px solid var(--border);
 }
-.progress-row .fill{ height:100%; background:var(--accent); border-radius:4px; transition:width .3s ease; }
+.progress-row .fill{ height:100%; width:100%; background:var(--accent); border-radius:4px; transform-origin:left; transition:transform .3s ease; }
 .progress-row .count{ flex:0 0 52px; text-align:right; font-size:12px; }
 
 /* Heatmap */
@@ -327,7 +327,7 @@ button{ font-family:inherit; }
 .section.open .chev{ transform:rotate(90deg); }
 
 .bar-track{ height:8px; background:var(--bg-subtle); border-radius:4px; overflow:hidden; margin:0 16px 14px; border:1px solid var(--border); border-width:1px 0; }
-.bar-fill{ height:100%; background:var(--good); border-radius:4px; transition:width .25s ease; }
+.bar-fill{ height:100%; width:100%; background:var(--good); border-radius:4px; transform-origin:left; transition:transform .25s ease; }
 
 .topics{ display:none; padding:0 10px 8px; }
 .section.open .topics{ display:block; }
@@ -379,7 +379,13 @@ button{ font-family:inherit; }
 .progress-menu-item .progress-dot.pp-in_progress{ background:var(--accent); }
 .progress-menu-item .progress-dot.pp-done{ background:var(--good); }
 
-.topic-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+.topic-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.topic-main .topic-extras{ margin-top:3px; }
+
+.topic-extras{ display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px 18px; }
+.topic-extras > .resources, .topic-extras > .notes-area{ flex:0 1 auto; min-width:0; }
+.topic-extras > .resources:has(.res-chips, .res-form),
+.topic-extras > .notes-area:has(.notes-preview, .notes-editor-panel){ flex-basis:100%; }
 .topic-text-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
 .topic-text-main{ display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; flex:1 1 auto; min-width:0; }
 .topic-text{ flex:1 1 auto; min-width:120px; font-size:13.5px; }
@@ -435,13 +441,13 @@ button{ font-family:inherit; }
 
 .res-add-btn{
   display:inline-flex; align-items:center; gap:5px;
-  appearance:none; border:1px dashed var(--border-strong); background:none; cursor:pointer;
-  color:var(--ink-soft); font-size:11.5px; font-weight:500;
-  padding:4px 10px; border-radius:999px;
-  transition:border-color .12s, color .12s, background .12s;
+  appearance:none; border:1px solid transparent; background:none; cursor:pointer;
+  color:var(--ink-faint); font-size:11.5px; font-weight:500;
+  padding:3px 7px; border-radius:6px;
+  transition:background .12s, color .12s;
 }
-.res-add-btn svg{ width:11px; height:11px; }
-.res-add-btn:hover, .res-add-btn.open{ border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); border-style:solid; }
+.res-add-btn svg{ width:11px; height:11px; opacity:.85; }
+.res-add-btn:hover, .res-add-btn.open{ color:var(--accent-ink); background:var(--accent-soft); }
 .res-add-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
 .res-form{
@@ -502,13 +508,13 @@ button{ font-family:inherit; }
 }
 .notes-toggle-btn{
   display:inline-flex; align-items:center; gap:5px;
-  appearance:none; border:1px dashed var(--border-strong); background:none; cursor:pointer;
-  color:var(--ink-soft); font-size:11.5px; font-weight:500;
-  padding:4px 10px; border-radius:999px;
-  transition:border-color .12s, color .12s, background .12s;
+  appearance:none; border:1px solid transparent; background:none; cursor:pointer;
+  color:var(--ink-faint); font-size:11.5px; font-weight:500;
+  padding:3px 7px; border-radius:6px;
+  transition:background .12s, color .12s;
 }
-.notes-toggle-btn svg{ width:12px; height:12px; }
-.notes-toggle-btn:hover{ border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft); border-style:solid; }
+.notes-toggle-btn svg{ width:11px; height:11px; opacity:.85; }
+.notes-toggle-btn:hover{ color:var(--accent-ink); background:var(--accent-soft); }
 .notes-toggle-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
 
 .notes-editor-panel{

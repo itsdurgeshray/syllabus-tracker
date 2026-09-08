@@ -369,7 +369,7 @@ function renderDashboard() {
       const row = el("div", "progress-row");
       row.innerHTML = `
         <span class="name">${sec.name}</span>
-        <span class="track"><span class="fill" style="width:${secPct}%"></span></span>
+        <span class="track"><span class="fill" style="transform:scaleX(${secPct / 100})"></span></span>
         <span class="count mono dim">${secDone}/${sec.topics.length}</span>`;
       panel.appendChild(row);
     });
@@ -496,7 +496,7 @@ function buildSection(tierKey, sec, si) {
   head.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
   wrap.appendChild(head);
 
-  const barTrack = el("div", "bar-track", `<div class="bar-fill" style="width:${pct}%"></div>`);
+  const barTrack = el("div", "bar-track", `<div class="bar-fill" style="transform:scaleX(${pct / 100})"></div>`);
   wrap.appendChild(barTrack);
 
   const topicsEl = el("div", "topics");
@@ -533,8 +533,10 @@ function buildTopicRow(tierKey, si, ti, tp) {
   const dateEl = el("span", "done-date", done ? `done ${state.checked[id]}` : "");
   main.appendChild(dateEl);
 
-  main.appendChild(buildResourceArea(id));
-  main.appendChild(buildNotesArea(id));
+  const extras = el("div", "topic-extras");
+  extras.appendChild(buildResourceArea(id));
+  extras.appendChild(buildNotesArea(id));
+  main.appendChild(extras);
 
   row.appendChild(main);
   return row;
@@ -825,7 +827,7 @@ function refreshSectionChrome(tierKey, si) {
   const wrap = sections[idx];
   if (!wrap) return;
   wrap.querySelector(".meta").textContent = sectionMetaText(sec, doneCount);
-  wrap.querySelector(".bar-fill").style.width = pct + "%";
+  wrap.querySelector(".bar-fill").style.transform = `scaleX(${pct / 100})`;
 }
 
 function sectionMetaText(sec, doneCount) {
