@@ -10,11 +10,23 @@ import TextAlign from "https://esm.sh/@tiptap/extension-text-align@3.31.3?deps=@
 
 const instances = new Map(); // container element -> Editor instance
 
+// Cloudinary unsigned upload — free tier, no Firebase Storage (which now needs
+// a billing account attached even for free-tier usage).
+const CLOUDINARY_CLOUD_NAME = "qgclhgct";
+const CLOUDINARY_UPLOAD_PRESET = "syllabus-tracker";
+
 /** Turns a pasted/dropped/picked image into an uploaded URL, inserted at the current selection. */
 async function insertImageBlob(editor, blob) {
-  if (!window.CloudSync) throw new Error("Sign-in isn't ready yet.");
-  const url = await window.CloudSync.uploadImage(blob);
-  editor.chain().focus().setImage({ src: url }).run();
+  const form = new FormData();
+  form.append("file", blob);
+  form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error("Image upload failed - try again.");
+  const data = await res.json();
+  editor.chain().focus().setImage({ src: data.secure_url }).run();
 }
 
 function mount(container, initialHTML, onChange) {

@@ -14,6 +14,33 @@
         "value": "geist mono",
         "createdAt": "2026-09-08T01:25:00.127Z",
         "reason": "user requested Geist & Monospace font explicitly for this build"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "app.js"
+        ],
+        "createdAt": "2026-09-09T14:03:44.660Z",
+        "reason": "lightbox <img> template built once with no src; src is always set at openImageLightbox() before it's ever shown, never rendered empty"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-09-09T14:05:08.057Z",
+        "reason": "sidebar-foot's mobile breakpoint swaps border-top for border-left and centers content via flexbox; nothing sits flush against a top edge there, so no inset is needed"
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-09-09T14:05:08.073Z",
+        "reason": "violet is one of three deliberate semantic resource-type tags (learning=blue, test=amber, reference=violet), not a decorative gradient"
       }
     ]
   }

@@ -7,9 +7,6 @@ import {
 import {
   getFirestore, doc, getDoc, setDoc, onSnapshot,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-import {
-  getStorage, ref as storageRef, uploadBytes, getDownloadURL,
-} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAKEgbNJ0djHlKAHTmR_NCU8_rnYxdKiRs",
@@ -23,7 +20,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
 let currentUser = null;
@@ -91,20 +87,9 @@ onAuthStateChanged(auth, async user => {
   });
 });
 
-/** Uploads an image blob to this user's own Storage folder and resolves its download URL. */
-async function uploadImage(blob) {
-  if (!currentUser) throw new Error("Sign in with Google to add images to notes.");
-  const ext = (blob.type && blob.type.split("/")[1]) || "png";
-  const path = `users/${currentUser.uid}/notes/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const fileRef = storageRef(storage, path);
-  await uploadBytes(fileRef, blob, { contentType: blob.type || "image/png" });
-  return getDownloadURL(fileRef);
-}
-
 window.CloudSync = {
   signIn,
   signOut: signOutUser,
   pushState,
-  uploadImage,
   getUser: () => currentUser,
 };

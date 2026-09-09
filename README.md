@@ -6,7 +6,7 @@ A fast, minimal study tracker for **SSC CGL** - Tier 1, Tier 2 Paper 1, and Tier
 
 - Full syllabus checklist for all three papers, with foundational/related topics flagged separately from core syllabus
 - Attach any number of **resources** to a topic - name + link, labeled Learning / Test / Reference, previewed with the link's own favicon (YouTube, PW, Testbook, or any site)
-- Rich text **notes** per topic (Tiptap editor: bold/italic/strike, lists, blockquote), plus a **Revise / Doubt / Skip** status dropdown, and a sort control (incomplete/completed/flagged first, A-Z)
+- Rich document **notes** per topic (Tiptap editor: headings, bold/italic/underline/strike, bullet/numbered/task lists, links, images via paste/drag-drop/upload with a click-to-expand lightbox, alignment, quotes), plus a **Revise / Doubt / Skip** status dropdown, and a sort control (incomplete/completed/flagged first, A-Z)
 - **Dashboard** with completion rings, per-section progress bars, a 91-day activity heatmap, streaks, a pace-based estimate of days remaining, and a "needs attention" rollup of flagged topics
 - Instant fuzzy search (`/` to focus) across every topic in the syllabus
 - **Google sign-in with cross-device sync**: signed out, everything is saved to `localStorage` only; signed in, the same state syncs to Firestore in real time, so progress survives a cleared cache and follows you to any device on the same Google account
@@ -31,6 +31,17 @@ A fast, minimal study tracker for **SSC CGL** - Tier 1, Tier 2 Paper 1, and Tier
      }
    }
    ```
+
+## Image uploads (Cloudinary)
+
+Note images (paste/drag-drop/upload) go through Cloudinary's free unsigned-upload API instead of Firebase Storage - Storage now requires the paid Blaze plan even for free-tier usage, while Cloudinary's free tier needs no card. `notes.js` holds `CLOUDINARY_CLOUD_NAME` and `CLOUDINARY_UPLOAD_PRESET`. To point it at your own account:
+
+1. Sign up free at [cloudinary.com](https://cloudinary.com/users/register_free) - no billing info required.
+2. Copy the **Cloud name** from your Dashboard.
+3. **Settings (gear icon) → Upload** → **Upload presets** → **Add upload preset** → set **Signing Mode** to **Unsigned** → Save, and note the preset name.
+4. Put both values into the constants at the top of `notes.js`.
+
+Uploads work independent of Google sign-in - they just need these two values configured correctly.
 
 **Deploy target matters for sign-in.** Google Sign-In needs the app's own origin to match `authDomain`, or Safari's cross-site storage rules silently break the redirect result on the way back (OAuth succeeds, but the app never sees it). Hosting on the same Firebase project sidesteps this entirely:
 ```bash
