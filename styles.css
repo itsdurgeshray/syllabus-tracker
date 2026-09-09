@@ -332,15 +332,16 @@ button{ font-family:inherit; }
 .topics{ display:none; padding:0 10px 8px; }
 .section.open .topics{ display:block; }
 
-.topic-row{ display:flex; align-items:flex-start; gap:11px; padding:12px 8px; border-bottom:1px solid var(--border); }
+.topic-row{ display:flex; align-items:flex-start; padding:12px 8px; border-bottom:1px solid var(--border); }
 .topic-row:last-child{ border-bottom:none; }
 .topic-row:hover{ background:var(--surface-hover); }
 .topic-row.hidden{ display:none; }
-.topic-row.in-progress{ background:var(--accent-soft); }
-.topic-row.in-progress:hover{ background:var(--accent-soft); filter:brightness(0.98); }
+
+/* All state indicators for a topic - progress, foundational flag, revise/doubt/skip - as one cluster */
+.topic-badges{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:none; margin-left:auto; }
 
 /* Progress pill (Not started / In progress / Done) + its dropdown menu */
-.progress-control{ position:relative; flex:none; margin-top:1px; }
+.progress-control{ position:relative; flex:none; }
 .progress-pill{
   display:inline-flex; align-items:center; gap:6px;
   appearance:none; cursor:pointer;
@@ -474,7 +475,7 @@ button{ font-family:inherit; }
 .res-save:hover{ background:#000; }
 
 /* ---------- Status dropdown (revise / doubt / skip) ---------- */
-.status-row{ flex:none; margin-left:auto; }
+.status-row{ flex:none; }
 .status-select-wrap{ position:relative; display:inline-flex; align-items:center; }
 .status-select-wrap::after{
   content:""; position:absolute; right:9px; top:50%; margin-top:-2px;
@@ -524,30 +525,122 @@ button{ font-family:inherit; }
   overflow:hidden;
 }
 .notes-toolbar{
-  display:flex; gap:2px; flex-wrap:wrap;
+  display:flex; align-items:center; gap:2px; flex-wrap:wrap;
   padding:6px; border-bottom:1px solid var(--border); background:var(--bg-subtle);
 }
 .notes-tool{
+  display:inline-flex; align-items:center; gap:3px;
   appearance:none; border:1px solid transparent; background:none; cursor:pointer;
   font-family:"Geist Mono"; font-size:11.5px; font-weight:600;
-  padding:4px 8px; border-radius:6px; color:var(--ink-soft);
-  min-width:26px;
+  padding:4px 7px; border-radius:6px; color:var(--ink-soft);
+  min-width:26px; min-height:26px; justify-content:center;
 }
+.notes-tool svg{ width:14px; height:14px; flex:none; }
 .notes-tool:hover{ background:var(--surface-hover); color:var(--ink); }
 .notes-tool.active{ background:var(--accent-soft); color:var(--accent-ink); }
 .notes-tool:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
 
-.notes-editor{ min-height:90px; max-height:320px; overflow-y:auto; padding:10px 12px; font-size:13.5px; line-height:1.55; }
+.tool-dropdown{ position:relative; }
+.tool-caret{ width:7px; height:7px; margin-left:1px; opacity:.6; }
+
+.tool-menu{
+  position:absolute; top:calc(100% + 5px); left:0; z-index:30;
+  min-width:150px;
+  background:var(--surface); border:1px solid var(--border); border-radius:9px;
+  box-shadow:var(--shadow-md);
+  padding:5px;
+}
+.tool-menu-item{
+  display:flex; align-items:center; gap:8px; width:100%;
+  appearance:none; border:none; background:none; cursor:pointer;
+  font-family:inherit; font-size:12.5px; font-weight:500; color:var(--ink);
+  padding:7px 8px; border-radius:6px; text-align:left; white-space:nowrap;
+}
+.tool-menu-item svg{ width:13px; height:13px; flex:none; color:var(--ink-faint); }
+.tool-menu-item:hover{ background:var(--surface-hover); }
+.tool-menu-item.active{ color:var(--accent-ink); font-weight:700; }
+.tool-menu-item.active svg{ color:var(--accent-ink); }
+
+.tool-link-popover{ padding:8px; min-width:220px; }
+.tool-link-popover form{ display:flex; gap:6px; }
+.tool-link-popover input{
+  flex:1; min-width:0; font-family:inherit; font-size:12.5px;
+  border:1px solid var(--border); border-radius:6px; padding:6px 8px;
+  background:var(--bg-subtle); color:var(--ink); outline:none;
+}
+.tool-link-popover input:focus{ border-color:var(--accent); background:var(--surface); }
+.tool-link-popover button{
+  appearance:none; border:none; cursor:pointer; flex:none;
+  background:var(--ink); color:#fff; font-size:12px; font-weight:600;
+  padding:6px 11px; border-radius:6px;
+}
+.tool-link-popover button:hover{ background:#000; }
+
+.notes-tool-error{
+  display:none; font-size:11.5px; color:var(--danger);
+  padding:6px 10px; border-bottom:1px solid var(--border); background:var(--danger-soft);
+}
+.notes-tool-error.show{ display:block; }
+
+.notes-editor{ min-height:90px; max-height:420px; overflow-y:auto; padding:10px 12px; font-size:13.5px; line-height:1.55; }
 .notes-loading{ color:var(--ink-faint); font-size:12.5px; }
 .notes-editor .ProseMirror{ outline:none; }
-.notes-editor .ProseMirror p{ margin:0 0 8px; }
-.notes-editor .ProseMirror p:last-child{ margin-bottom:0; }
-.notes-editor .ProseMirror ul, .notes-editor .ProseMirror ol{ margin:0 0 8px; padding-left:22px; }
-.notes-editor .ProseMirror blockquote{ margin:0 0 8px; padding-left:10px; border-left:2px solid var(--border-strong); color:var(--ink-soft); }
+.notes-editor .ProseMirror > * + *{ margin-top:8px; }
+.notes-editor .ProseMirror p{ margin:0; }
+.notes-editor .ProseMirror h1, .notes-editor .ProseMirror h2, .notes-editor .ProseMirror h3{ font-family:"Geist"; line-height:1.3; }
+.notes-editor .ProseMirror h1{ font-size:19px; font-weight:700; }
+.notes-editor .ProseMirror h2{ font-size:16.5px; font-weight:700; }
+.notes-editor .ProseMirror h3{ font-size:14.5px; font-weight:700; }
+.notes-editor .ProseMirror ul, .notes-editor .ProseMirror ol{ padding-left:22px; }
+.notes-editor .ProseMirror ul li, .notes-editor .ProseMirror ol li{ margin:3px 0; }
+.notes-editor .ProseMirror blockquote{ padding-left:10px; border-left:2px solid var(--border-strong); color:var(--ink-soft); }
+.notes-editor .ProseMirror hr{ border:none; border-top:1px solid var(--border); margin:10px 0; }
 .notes-editor .ProseMirror strong{ font-weight:700; }
-.notes-editor .ProseMirror p.is-editor-empty:first-child::before{
-  content:"Write a note…"; float:left; height:0; pointer-events:none; color:var(--ink-faint);
+.notes-editor .ProseMirror code{
+  font-family:"Geist Mono"; font-size:12px; background:var(--bg-subtle);
+  border:1px solid var(--border); border-radius:4px; padding:1px 5px;
 }
+.notes-editor .ProseMirror a{ color:var(--accent-ink); text-decoration:underline; text-decoration-color:var(--accent-soft); }
+
+.notes-editor .ProseMirror ul[data-type="taskList"]{ list-style:none; padding-left:2px; }
+.notes-editor .ProseMirror ul[data-type="taskList"] li{ display:flex; align-items:flex-start; gap:7px; margin:4px 0; }
+.notes-editor .ProseMirror ul[data-type="taskList"] li > label{ flex:none; margin-top:2px; }
+.notes-editor .ProseMirror ul[data-type="taskList"] li > div{ flex:1; min-width:0; }
+.notes-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"]{
+  appearance:none; -webkit-appearance:none; width:15px; height:15px;
+  border:1.5px solid var(--border-strong); border-radius:4px; cursor:pointer; position:relative;
+}
+.notes-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked{ background:var(--good); border-color:var(--good); }
+.notes-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked::after{
+  content:""; position:absolute; left:4px; top:0px; width:4px; height:8px;
+  border:solid white; border-width:0 2px 2px 0; transform:rotate(45deg);
+}
+.notes-editor .ProseMirror li[data-checked="true"] > div{ color:var(--ink-faint); text-decoration:line-through; }
+
+.notes-editor .ProseMirror img{
+  max-width:100%; max-height:280px; display:block; border-radius:8px;
+  border:1px solid var(--border); cursor:zoom-in;
+}
+
+.notes-editor .ProseMirror p.is-editor-empty:first-child::before{
+  content:attr(data-placeholder); float:left; height:0; pointer-events:none; color:var(--ink-faint);
+}
+
+/* ---------- Image lightbox ---------- */
+.img-lightbox{
+  display:none; position:fixed; inset:0; z-index:100;
+  background:rgba(17,17,17,.82);
+  align-items:center; justify-content:center; padding:40px;
+}
+.img-lightbox.open{ display:flex; }
+.img-lightbox img{ max-width:100%; max-height:100%; border-radius:6px; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+.img-lightbox-close{
+  position:absolute; top:20px; right:24px;
+  appearance:none; border:none; cursor:pointer;
+  background:rgba(255,255,255,.12); color:#fff; font-size:22px; line-height:1;
+  width:36px; height:36px; border-radius:50%;
+}
+.img-lightbox-close:hover{ background:rgba(255,255,255,.2); }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 860px){

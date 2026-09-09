@@ -511,23 +511,26 @@ function buildTopicRow(tierKey, si, ti, tp) {
   const done = isDone(id);
   const row = el("div", "topic-row" + (done ? " done" : "") + (isInProgress(id) ? " in-progress" : ""));
 
-  row.appendChild(buildProgressControl(id, key => {
-    row.classList.toggle("done", key === "done");
-    row.classList.toggle("in-progress", key === "in_progress");
-    dateEl.textContent = key === "done" ? `done ${state.checked[id]}` : "";
-    refreshSectionChrome(tierKey, si);
-    renderSidebarRing();
-  }));
-
   const main = el("div", "topic-main");
 
   const textRow = el("div", "topic-text-row");
   const textMain = el("div", "topic-text-main");
   const label = el("span", "topic-text", tp.t);
   textMain.appendChild(label);
-  if (tp.r) textMain.appendChild(el("span", "tag", "foundational"));
   textRow.appendChild(textMain);
-  textRow.appendChild(buildStatusRow(id));
+
+  // All state indicators - progress, foundational flag, revise/doubt/skip - grouped as one badge cluster.
+  const badges = el("div", "topic-badges");
+  badges.appendChild(buildProgressControl(id, key => {
+    row.classList.toggle("done", key === "done");
+    row.classList.toggle("in-progress", key === "in_progress");
+    dateEl.textContent = key === "done" ? `done ${state.checked[id]}` : "";
+    refreshSectionChrome(tierKey, si);
+    renderSidebarRing();
+  }));
+  if (tp.r) badges.appendChild(el("span", "tag", "foundational"));
+  badges.appendChild(buildStatusRow(id));
+  textRow.appendChild(badges);
   main.appendChild(textRow);
 
   const dateEl = el("span", "done-date", done ? `done ${state.checked[id]}` : "");
@@ -734,10 +737,17 @@ function buildResourceForm(id) {
 }
 
 /* ---------- Notes (Tiptap) ---------- */
-const NOTE_TOOLS = [
-  ["bold", "B"], ["italic", "I"], ["strike", "S"],
-  ["bulletList", "•"], ["orderedList", "1."], ["blockquote", "❝"], ["clear", "Clear"],
-];
+const TOOL_ICONS = {
+  list: '<svg viewBox="0 0 16 16" fill="none"><circle cx="2.3" cy="4" r="1" fill="currentColor"/><circle cx="2.3" cy="8" r="1" fill="currentColor"/><circle cx="2.3" cy="12" r="1" fill="currentColor"/><path d="M6 4h8M6 8h8M6 12h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  ordered: '<svg viewBox="0 0 16 16" fill="none"><rect x="1.3" y="3.2" width="2" height="2" rx="0.4" fill="currentColor"/><rect x="1.3" y="7.2" width="2" height="2" rx="0.4" fill="currentColor"/><rect x="1.3" y="11.2" width="2" height="2" rx="0.4" fill="currentColor"/><path d="M6 4h8M6 8h8M6 12h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  task: '<svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M2.7 4.5l0.9 0.9 1.8-1.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 4.5h5.5M1.5 11h5M9 11h5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  text: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 4h10M8 4v9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  align: '<svg viewBox="0 0 16 16" fill="none"><path d="M2 3.5h12M2 7h8M2 10.5h12M2 14h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  link: '<svg viewBox="0 0 16 16" fill="none"><path d="M6.3 9.7l3.4-3.4M4.7 11.3l-1.4 1.4a2.5 2.5 0 0 1-3.5-3.5l1.4-1.4m7.6-2.9L10.3 3.4a2.5 2.5 0 0 1 3.5 3.5l-1.4 1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  image: '<svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><circle cx="5" cy="6" r="1" fill="currentColor"/><path d="M2.5 11l3.5-3.5L9 10l1.5-1.5 2.5 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  more: '<svg viewBox="0 0 16 16" fill="none"><circle cx="3" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="13" cy="8" r="1.2" fill="currentColor"/></svg>',
+  caret: '<svg class="tool-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
 
 function buildNotesArea(id) {
   const wrap = el("div", "notes-area");
@@ -769,25 +779,248 @@ function refreshNotesArea(id) {
   });
 }
 
+let closeOpenToolMenu = null;
+
+/** A toolbar button that opens a floating menu of choices (List type, Text style, Align...). */
+function buildToolDropdown(editorElGetter, { icon, showCaret, cmds }) {
+  const wrap = el("div", "tool-dropdown");
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "notes-tool tool-dropdown-trigger";
+  trigger.innerHTML = icon + (showCaret ? TOOL_ICONS.caret : "");
+  trigger.addEventListener("mousedown", e => e.preventDefault());
+  trigger.addEventListener("click", e => {
+    e.stopPropagation();
+    if (wrap.querySelector(".tool-menu")) { if (closeOpenToolMenu) closeOpenToolMenu(); return; }
+    openMenu();
+  });
+  wrap.appendChild(trigger);
+
+  function openMenu() {
+    if (closeOpenToolMenu) closeOpenToolMenu();
+    const editorEl = editorElGetter();
+    const menu = el("div", "tool-menu");
+    cmds.forEach(({ cmd, label, icon: itemIcon }) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "tool-menu-item" + (window.TiptapNotes && window.TiptapNotes.isActive(editorEl, cmd) ? " active" : "");
+      item.innerHTML = (itemIcon || "") + `<span>${label}</span>`;
+      item.addEventListener("mousedown", e => e.preventDefault());
+      item.addEventListener("click", e => {
+        e.stopPropagation();
+        if (window.TiptapNotes) window.TiptapNotes.run(editorEl, cmd);
+        closeMenu();
+      });
+      menu.appendChild(item);
+    });
+    wrap.appendChild(menu);
+    function closeMenu() {
+      menu.remove();
+      document.removeEventListener("click", outsideHandler);
+      closeOpenToolMenu = null;
+    }
+    function outsideHandler(e) { if (!wrap.contains(e.target)) closeMenu(); }
+    setTimeout(() => document.addEventListener("click", outsideHandler), 0);
+    closeOpenToolMenu = closeMenu;
+  }
+
+  wrap._refreshActive = () => {
+    const editorEl = editorElGetter();
+    trigger.classList.toggle("active", window.TiptapNotes && cmds.some(c => window.TiptapNotes.isActive(editorEl, c.cmd)));
+  };
+  return wrap;
+}
+
+/** The link toolbar button: opens a small popover with a URL field instead of a native prompt(). */
+function buildLinkTool(editorElGetter) {
+  const wrap = el("div", "tool-dropdown");
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "notes-tool";
+  trigger.innerHTML = TOOL_ICONS.link;
+  trigger.title = "Link";
+  trigger.addEventListener("mousedown", e => e.preventDefault());
+  trigger.addEventListener("click", e => {
+    e.stopPropagation();
+    if (wrap.querySelector(".tool-menu")) { if (closeOpenToolMenu) closeOpenToolMenu(); return; }
+    openPopover();
+  });
+  wrap.appendChild(trigger);
+
+  function openPopover() {
+    if (closeOpenToolMenu) closeOpenToolMenu();
+    const editorEl = editorElGetter();
+    const menu = el("div", "tool-menu tool-link-popover");
+    const form = document.createElement("form");
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "https://...";
+    input.value = window.TiptapNotes ? window.TiptapNotes.getLinkHref(editorEl) : "";
+    const submit = document.createElement("button");
+    submit.type = "submit";
+    submit.textContent = "Apply";
+    form.append(input, submit);
+    form.addEventListener("mousedown", e => e.stopPropagation());
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      let url = input.value.trim();
+      if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+      if (window.TiptapNotes) window.TiptapNotes.run(editorEl, "link", url || null);
+      closeMenu();
+    });
+    menu.appendChild(form);
+    wrap.appendChild(menu);
+    setTimeout(() => input.focus(), 0);
+    function closeMenu() {
+      menu.remove();
+      document.removeEventListener("click", outsideHandler);
+      closeOpenToolMenu = null;
+    }
+    function outsideHandler(e) { if (!wrap.contains(e.target)) closeMenu(); }
+    setTimeout(() => document.addEventListener("click", outsideHandler), 0);
+    closeOpenToolMenu = closeMenu;
+  }
+
+  wrap._refreshActive = () => {
+    trigger.classList.toggle("active", window.TiptapNotes && window.TiptapNotes.isActive(editorElGetter(), "link"));
+  };
+  return wrap;
+}
+
+let lightboxEl = null;
+function openImageLightbox(src) {
+  if (!lightboxEl) {
+    lightboxEl = el("div", "img-lightbox");
+    lightboxEl.innerHTML = '<img alt="" /><button type="button" class="img-lightbox-close" aria-label="Close">&times;</button>';
+    lightboxEl.addEventListener("click", e => { if (e.target === lightboxEl || e.target.closest(".img-lightbox-close")) closeImageLightbox(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeImageLightbox(); });
+    document.body.appendChild(lightboxEl);
+  }
+  lightboxEl.querySelector("img").src = src;
+  lightboxEl.classList.add("open");
+}
+function closeImageLightbox() {
+  if (lightboxEl) lightboxEl.classList.remove("open");
+}
+
 function openNotesEditor(id, wrap) {
   wrap.classList.add("open");
   wrap.querySelector(".notes-toggle-btn").querySelector("span").textContent = "Close note";
 
   const panel = el("div", "notes-editor-panel");
   const toolbar = el("div", "notes-toolbar");
-  NOTE_TOOLS.forEach(([cmd, label]) => {
+  const getEditorEl = () => editorEl;
+
+  const simpleTools = [
+    ["bold", "<b>B</b>", "Bold"],
+    ["italic", "<i>I</i>", "Italic"],
+    ["underline", "<u>U</u>", "Underline"],
+    ["strike", "<s>S</s>", "Strikethrough"],
+    ["code", "&lt;/&gt;", "Code"],
+  ];
+
+  const dropdowns = [];
+
+  const listDropdown = buildToolDropdown(getEditorEl, {
+    icon: TOOL_ICONS.list, showCaret: true,
+    cmds: [
+      { cmd: "bulletList", label: "Bullet list", icon: TOOL_ICONS.list },
+      { cmd: "orderedList", label: "Numbered list", icon: TOOL_ICONS.ordered },
+      { cmd: "taskList", label: "Task list", icon: TOOL_ICONS.task },
+    ],
+  });
+  toolbar.appendChild(listDropdown);
+  dropdowns.push(listDropdown);
+
+  const styleDropdown = buildToolDropdown(getEditorEl, {
+    icon: TOOL_ICONS.text, showCaret: true,
+    cmds: [
+      { cmd: "paragraph", label: "Text" },
+      { cmd: "heading1", label: "Heading 1" },
+      { cmd: "heading2", label: "Heading 2" },
+      { cmd: "heading3", label: "Heading 3" },
+    ],
+  });
+  toolbar.appendChild(styleDropdown);
+  dropdowns.push(styleDropdown);
+
+  simpleTools.forEach(([cmd, html, title]) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "notes-tool";
     btn.dataset.cmd = cmd;
-    btn.textContent = label;
-    btn.addEventListener("mousedown", e => e.preventDefault()); // keep editor selection focused
+    btn.title = title;
+    btn.innerHTML = html;
+    btn.addEventListener("mousedown", e => e.preventDefault());
     btn.addEventListener("click", () => { if (window.TiptapNotes) window.TiptapNotes.run(editorEl, cmd); });
     toolbar.appendChild(btn);
   });
+
+  const alignDropdown = buildToolDropdown(getEditorEl, {
+    icon: TOOL_ICONS.align, showCaret: true,
+    cmds: [
+      { cmd: "align-left", label: "Align left" },
+      { cmd: "align-center", label: "Align center" },
+      { cmd: "align-right", label: "Align right" },
+    ],
+  });
+  toolbar.appendChild(alignDropdown);
+  dropdowns.push(alignDropdown);
+
+  const linkTool = buildLinkTool(getEditorEl);
+  toolbar.appendChild(linkTool);
+  dropdowns.push(linkTool);
+
+  const imageBtn = document.createElement("button");
+  imageBtn.type = "button";
+  imageBtn.className = "notes-tool";
+  imageBtn.title = "Add image";
+  imageBtn.innerHTML = TOOL_ICONS.image;
+  const imageInput = document.createElement("input");
+  imageInput.type = "file";
+  imageInput.accept = "image/*";
+  imageInput.multiple = true;
+  imageInput.hidden = true;
+  imageInput.addEventListener("change", () => {
+    Array.from(imageInput.files || []).forEach(file => {
+      window.TiptapNotes && window.TiptapNotes.insertImageFile(editorEl, file).catch(showImageError);
+    });
+    imageInput.value = "";
+  });
+  imageBtn.addEventListener("mousedown", e => e.preventDefault());
+  imageBtn.addEventListener("click", () => imageInput.click());
+  toolbar.appendChild(imageBtn);
+  toolbar.appendChild(imageInput);
+
+  const moreDropdown = buildToolDropdown(getEditorEl, {
+    icon: TOOL_ICONS.more, showCaret: false,
+    cmds: [
+      { cmd: "blockquote", label: "Quote" },
+      { cmd: "horizontalRule", label: "Divider" },
+      { cmd: "clear", label: "Clear formatting" },
+    ],
+  });
+  toolbar.appendChild(moreDropdown);
+
   panel.appendChild(toolbar);
 
-  const editorEl = el("div", "notes-editor", '<span class="notes-loading">Loading editor…</span>');
+  const imgError = el("div", "notes-tool-error");
+  panel.appendChild(imgError);
+  let imgErrorTimer;
+  function showImageError(err) {
+    imgError.textContent = err && err.message ? err.message : "Couldn't add that image.";
+    imgError.classList.add("show");
+    clearTimeout(imgErrorTimer);
+    imgErrorTimer = setTimeout(() => imgError.classList.remove("show"), 4000);
+  }
+
+  const editorEl = el("div", "notes-editor", '<span class="notes-loading">Loading editor...</span>');
+  editorEl.addEventListener("click", e => {
+    const img = e.target.closest("img");
+    if (img) { e.preventDefault(); openImageLightbox(img.src); }
+  });
+  editorEl._imageErrorListener = e => { if (e.detail.container === editorEl) showImageError(e.detail.error); };
+  window.addEventListener("tiptap-image-error", editorEl._imageErrorListener);
   panel.appendChild(editorEl);
   wrap.appendChild(panel);
 
@@ -799,10 +1032,10 @@ function openNotesEditor(id, wrap) {
       saveTimer = setTimeout(() => setNote(id, html, text), 400);
     });
     editorEl._toolbarUpdate = () => {
-      toolbar.querySelectorAll(".notes-tool").forEach(b => {
-        if (b.dataset.cmd === "clear") return;
+      toolbar.querySelectorAll(".notes-tool[data-cmd]").forEach(b => {
         b.classList.toggle("active", window.TiptapNotes.isActive(editorEl, b.dataset.cmd));
       });
+      dropdowns.forEach(d => d._refreshActive());
     };
   };
 
@@ -813,7 +1046,10 @@ function openNotesEditor(id, wrap) {
 function closeNotesEditor(id, wrap) {
   const panel = wrap.querySelector(".notes-editor-panel");
   const editorEl = panel && panel.querySelector(".notes-editor");
-  if (editorEl && window.TiptapNotes) window.TiptapNotes.destroy(editorEl);
+  if (editorEl) {
+    if (window.TiptapNotes) window.TiptapNotes.destroy(editorEl);
+    if (editorEl._imageErrorListener) window.removeEventListener("tiptap-image-error", editorEl._imageErrorListener);
+  }
   refreshNotesArea(id);
 }
 
